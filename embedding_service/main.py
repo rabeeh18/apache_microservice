@@ -17,6 +17,12 @@ app.add_middleware(
 # Load the model on CPU only
 model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2", device="cpu")
 
+import re
+
+def normalize_text(text: str) -> str:
+    # Collapse repeated spaces/newlines into one space, strip, and lowercase
+    return re.sub(r'\s+', ' ', text).strip().lower()
+
 class EmbedRequest(BaseModel):
     text: str
 
@@ -25,7 +31,8 @@ class EmbedResponse(BaseModel):
 
 @app.post("/embed", response_model=EmbedResponse)
 def embed_text(request: EmbedRequest):
-    embedding = model.encode(request.text).tolist()
+    normalized = normalize_text(request.text)
+    embedding = model.encode(normalized).tolist()
     return EmbedResponse(embedding=embedding)
 
 import requests
@@ -43,11 +50,12 @@ class InsertResponse(BaseModel):
 
 @app.post("/insert", response_model=InsertResponse)
 def insert_record(request: InsertRequest):
-    embedding = model.encode(request.text).tolist()
+    normalized = normalize_text(request.text)
+    embedding = model.encode(normalized).tolist()
     record_id = str(uuid.uuid4())
     doc = {
         "id": record_id,
-        "text": request.text,
+        "text": normalized,
         "vector": embedding
     }
     res = requests.post(f"{SOLR_URL}/update?commit=true", json=[doc])
@@ -73,7 +81,8 @@ def search_records(request: SearchRequest):
         except ValueError:
             top_k = 10
 
-    query_vector = model.encode(request.query).tolist()
+    normalized_query = normalize_text(request.query)
+    query_vector = model.encode(normalized_query).tolist()
     solr_query = f"{{!knn f=vector topK={top_k}}}[{','.join(map(str, query_vector))}]"
     
     res = requests.post(f"{SOLR_URL}/select", json={

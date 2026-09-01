@@ -29,7 +29,7 @@ The Embedding Service (running on port `8000`) exposes a complete backend API th
 ### 1. Insert a Record
 **URL:** `http://localhost:8000/insert`
 **Method:** `POST`
-**Description:** Accepts a text string, automatically generates its 384-dimensional embedding using the CPU model, and stores both the text and vector in Solr.
+**Description:** Accepts a raw text string. Before embedding or storage, the text is **normalized** (stripped, lowercased, repeated whitespace collapsed). The normalized text and its 384-dimensional vector are stored in Solr.
 **Request Format:** `{"text": "your text here"}`
 **Response Format:** `{"id": "uuid-of-record", "message": "Record successfully inserted"}`
 **Example:**
@@ -40,7 +40,7 @@ curl -X POST -H "Content-Type: application/json" -d '{"text": "machine learning"
 ### 2. Search Records
 **URL:** `http://localhost:8000/search`
 **Method:** `POST`
-**Description:** Accepts a query string and desired result count ("10", "20", or "all"). Automatically embeds the query, performs KNN semantic search in Solr, and returns the ranked records with mathematically exact True Cosine Similarities alongside a combined mean score.
+**Description:** Accepts a query string and desired result count ("10", "20", or "all"). The query is **normalized** (same rules as `/insert`) before embedding. Performs KNN semantic search and returns ranked records with True Cosine Similarity scores and a combined mean score.
 **Request Format:** `{"query": "your query", "result_count": "10"}`
 **Response Format:** `{"results": [{"id": "...", "text": "...", "similarity": 0.85}], "combined_score": 0.85}`
 **Example:**

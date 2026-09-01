@@ -12,6 +12,19 @@ The system consists of three main services orchestrated via Docker Compose:
 - **API Endpoint**: `POST /embed` (Accepts `{"text": "..."}`, returns `{"embedding": [...]}`).
 - This exact model is used consistently for indexing records and embedding search queries.
 
+## Text Normalization
+All text is normalized **before** embedding and before storage. The same `normalize_text` function is applied in `/insert`, `/search`, and `/embed`.
+
+Normalization steps (in order):
+1. Collapse all repeated whitespace (spaces, tabs, newlines) into a single space.
+2. Strip leading and trailing whitespace.
+3. Lowercase the entire string.
+4. Punctuation is preserved as-is.
+
+Example: `"Hello   WORLD"` → `"hello world"`
+
+This ensures that embeddings and stored text are always in a consistent, canonical form.
+
 ## Apache Solr and KNN Vector Search
 - **Version**: Official Solr 9 Docker image.
 - **Field Configuration**: A `knn_vector` field with `vectorDimension=384` and `similarityFunction=cosine`.
