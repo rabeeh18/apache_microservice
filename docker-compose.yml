@@ -1,0 +1,67 @@
+version: '3.8'
+
+services:
+  gui:
+    build: ./gui
+    ports:
+      - "8080:80"
+    depends_on:
+      - embedding
+      - solr
+    networks:
+      - search_net
+
+  embedding:
+    build: ./embedding_service
+    ports:
+      - "8000:8000"
+    networks:
+      - search_net
+
+  solr:
+    image: solr:9
+    ports:
+      - "8983:8983"
+    volumes:
+      - solr_data:/var/solr
+    networks:
+      - search_net
+    command:
+      - solr-precreate
+      - semantic_search
+
+  setup:
+    image: curlimages/curl
+    depends_on:
+      - solr
+    networks:
+      - search_net
+    command: >
+      sh -c "
+      echo 'Waiting for solr...';
+      until curl -s http://solr:8983/solr/admin/info/system; do
+        sleep 2;
+      done;
+      echo 'Configuring schema...';
+      curl -X POST -H 'Content-type:application/json' --data-binary '{
+        \"add-field-type\": {
+          \"name\": \"knn_vector\",
+          \"class\": \"solr.DenseVectorField\",
+          \"vectorDimension\": 384,
+          \"similarityFunction\": \"cosine\"
+        },
+        \"add-field\": {
+          \"name\": \"vector\",
+          \"type\": \"knn_vector\",
+          \"indexed\": true,
+          \"stored\": true
+        }
+      }' http://solr:8983/solr/semantic_search/schema || true;
+      echo 'Schema configured.'
+      "
+
+networks:
+  search_net:
+
+volumes:
+  solr_data:

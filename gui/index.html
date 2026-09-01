@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Semantic Search System</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Semantic Search System</h1>
+            <p>Powered by Apache Solr and all-MiniLM-L6-v2</p>
+        </header>
+
+        <section class="search-section">
+            <div class="input-group">
+                <input type="text" id="queryInput" placeholder="Enter your semantic query..." />
+                <button id="searchBtn">Search</button>
+            </div>
+            
+            <div class="controls">
+                <label>Results to fetch:</label>
+                <div class="radio-group">
+                    <label><input type="radio" name="resultCount" value="10" checked> Top 10</label>
+                    <label><input type="radio" name="resultCount" value="20"> Top 20</label>
+                    <label><input type="radio" name="resultCount" value="all"> All</label>
+                </div>
+            </div>
+        </section>
+
+        <section class="results-section">
+            <div id="summary" class="summary hidden">
+                <p><strong>Combined Semantic Similarity:</strong> <span id="combinedScore">0.000</span></p>
+            </div>
+            
+            <div id="resultsList" class="results-list">
+                <!-- Results will be injected here -->
+            </div>
+        </section>
+
+        <section class="admin-section">
+            <h2>Administration</h2>
+            <button id="clearDbBtn" class="danger">Clear Database</button>
+        </section>
+
+        <section class="info-section">
+            <h2>Notes / How To Use</h2>
+            <p>This GUI connects to the local Embedding Service and Apache Solr instance.</p>
+            <ul>
+                <li><strong>Search:</strong> Type a query and hit Search. The text is embedded and sent to Solr for KNN similarity search.</li>
+                <li><strong>Result Count:</strong> Choose how many results to retrieve.</li>
+                <li><strong>Preview:</strong> Click "Show Preview" on any result to see the associated text.</li>
+                <li><strong>Combined Score:</strong> Shows the arithmetic mean of the similarity scores for the selected result set.</li>
+            </ul>
+        </section>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
