@@ -3,99 +3,87 @@ import time
 import sys
 import statistics
 
-EMBED_URL = "http://localhost:8000"
-SOLR_URL = "http://localhost:8983/solr/semantic_search"
+API_URL = "http://localhost:8000"
 
 def wait_for_services():
-    print("Waiting for Embedding Service...")
-    for _ in range(30):
-        try:
-            res = requests.get(f"{EMBED_URL}/health")
-            if res.status_code == 200:
-                print("Embedding service is up!")
-                break
-        except requests.ConnectionError:
-            pass
-        time.sleep(2)
-    else:
-        print("Embedding service failed to start.")
-        sys.exit(1)
-
-    print("Waiting for Solr Service and Schema...")
+    print("Waiting for Embedding API Service...")
     for _ in range(60):
         try:
-            res = requests.get(f"{SOLR_URL}/schema")
-            if res.status_code == 200 and "knn_vector" in res.text:
-                print("Solr and schema are ready!")
+            res = requests.get(f"{API_URL}/health")
+            if res.status_code == 200:
+                print("API service is up!")
                 break
         except requests.ConnectionError:
             pass
         time.sleep(2)
     else:
-        print("Solr service/schema failed to initialize.")
+        print("API service failed to start.")
         sys.exit(1)
-
-def embed_text(text):
-    res = requests.post(f"{EMBED_URL}/embed", json={"text": text})
-    assert res.status_code == 200
-    vector = res.json()["embedding"]
-    assert len(vector) == 384, "Embedding must be exactly 384 dimensions"
-    return vector
 
 def test_system():
     wait_for_services()
 
-    print("1. Testing Embedding Service (384-dimensional output)...")
-    docs = [
-        {"id": "doc1", "text": "machine learning applications in education"},
-        {"id": "doc2", "text": "artificial intelligence in the classroom"},
-        {"id": "doc3", "text": "recipes for baking chocolate chip cookies"}
-    ]
-
-    for doc in docs:
-        doc["vector"] = embed_text(doc["text"])
-    
+    print("1. Testing Embedding Service (/embed) directly...")
+    res = requests.post(f"{API_URL}/embed", json={"text": "test embedding"})
+    assert res.status_code == 200
+    vector = res.json()["embedding"]
+    assert len(vector) == 384, "Embedding must be exactly 384 dimensions"
     print("Embedding service passed.")
 
-    print("2. Testing Solr Connectivity and Indexing...")
-    # Clear first just in case
-    requests.post(f"{SOLR_URL}/update?commit=true", json={"delete": {"query": "*:*"}})
-    
-    res = requests.post(f"{SOLR_URL}/update?commit=true", json=docs)
-    assert res.status_code == 200, f"Failed to index: {res.text}"
+    print("2. Testing Clear Database (/clear)...")
+    res = requests.delete(f"{API_URL}/clear")
+    assert res.status_code == 200
+    print("Database cleared.")
+
+    print("3. Testing Indexing (/insert)...")
+    docs = [
+        "machine learning applications in education",
+        "artificial intelligence in the classroom",
+        "recipes for baking chocolate chip cookies"
+    ]
+
+    for text in docs:
+        res = requests.post(f"{API_URL}/insert", json={"text": text})
+        assert res.status_code == 200, f"Failed to index: {res.text}"
+        assert "id" in res.json()
     print("Indexing passed.")
 
-    print("3. Testing KNN Search, Top N, and Similarity Scores...")
+    print("4. Testing KNN Search, Top N, and Similarity Scores (/search)...")
     query = "AI in schools"
-    query_vector = embed_text(query)
-
-    # Test Top 2
-    solr_query = f"{{!knn f=vector topK=2}}{query_vector}"
-    res = requests.post(f"{SOLR_URL}/select", json={
-        "query": solr_query,
-        "fields": ["id", "text", "score"],
-        "limit": 2
+    
+    # Test Top 10
+    res = requests.post(f"{API_URL}/search", json={
+        "query": query,
+        "result_count": "10"
     })
     
     assert res.status_code == 200
     data = res.json()
-    assert len(data["response"]["docs"]) == 2, "Should return exactly 2 results"
+    assert len(data["results"]) == 3, "Should return exactly 3 results (since only 3 exist)"
     
     # Check that scores are present and valid
-    scores = [doc["score"] for doc in data["response"]["docs"]]
-    assert all(0 <= s <= 2 for s in scores), "Scores should be normalized cosine (0-1 approx)"
+    scores = [doc["similarity"] for doc in data["results"]]
+    assert all(-1.0 <= s <= 1.0 for s in scores), "True cosine scores should be -1 to 1"
     
-    # Calculate combined score
-    combined_score = sum(scores) / len(scores)
-    print(f"Top 2 passed. Combined score: {combined_score:.3f}")
+    combined_score = data["combined_score"]
+    print(f"Top 10 passed. Combined true cosine score: {combined_score:.3f}")
 
-    print("4. Testing Clear Database...")
-    res = requests.post(f"{SOLR_URL}/update?commit=true", json={"delete": {"query": "*:*"}})
+    # Test All
+    res_all = requests.post(f"{API_URL}/search", json={
+        "query": query,
+        "result_count": "all"
+    })
+    data_all = res_all.json()
+    assert len(data_all["results"]) == 3, "All should return all 3 results"
+    print(f"'All' logic passed. Retrieved {len(data_all['results'])} records.")
+
+    print("5. Testing Final Clear Database (/clear)...")
+    res = requests.delete(f"{API_URL}/clear")
     assert res.status_code == 200
 
-    # Verify empty
-    res = requests.get(f"{SOLR_URL}/select?q=*:*")
-    assert res.json()["response"]["numFound"] == 0, "Database should be empty"
+    # Verify empty by searching again
+    res = requests.post(f"{API_URL}/search", json={"query": "test", "result_count": "all"})
+    assert len(res.json()["results"]) == 0, "Database should be empty"
     print("Clear Database passed.")
 
     print("\nALL TESTS PASSED SUCCESSFULLY!")

@@ -1,6 +1,3 @@
-# Semantic Search Project
-
-A clean, reproducible semantic search system using Apache Solr and `sentence-transformers/all-MiniLM-L6-v2`.
 
 ## Setup Instructions
 
@@ -24,3 +21,40 @@ A clean, reproducible semantic search system using Apache Solr and `sentence-tra
 6. Click **Show Preview** on any result to see the full text.
 
 For more detailed architectural information, please see `info.md`.
+
+## Public API Endpoints
+
+The Embedding Service (running on port `8000`) exposes a complete backend API that integrates with Solr. The GUI uses these exact endpoints.
+
+### 1. Insert a Record
+**URL:** `http://localhost:8000/insert`
+**Method:** `POST`
+**Description:** Accepts a text string, automatically generates its 384-dimensional embedding using the CPU model, and stores both the text and vector in Solr.
+**Request Format:** `{"text": "your text here"}`
+**Response Format:** `{"id": "uuid-of-record", "message": "Record successfully inserted"}`
+**Example:**
+```bash
+curl -X POST -H "Content-Type: application/json" -d '{"text": "machine learning"}' http://localhost:8000/insert
+```
+
+### 2. Search Records
+**URL:** `http://localhost:8000/search`
+**Method:** `POST`
+**Description:** Accepts a query string and desired result count ("10", "20", or "all"). Automatically embeds the query, performs KNN semantic search in Solr, and returns the ranked records with mathematically exact True Cosine Similarities alongside a combined mean score.
+**Request Format:** `{"query": "your query", "result_count": "10"}`
+**Response Format:** `{"results": [{"id": "...", "text": "...", "similarity": 0.85}], "combined_score": 0.85}`
+**Example:**
+```bash
+curl -X POST -H "Content-Type: application/json" -d '{"query": "machine learning", "result_count": "10"}' http://localhost:8000/search
+```
+
+### 3. Clear Database
+**URL:** `http://localhost:8000/clear`
+**Method:** `DELETE`
+**Description:** Deletes all indexed records from the Solr collection, effectively emptying the database while preserving the schema and vector configurations for future use.
+**Request Format:** No body required.
+**Response Format:** `{"message": "Database cleared successfully"}`
+**Example:**
+```bash
+curl -X DELETE http://localhost:8000/clear
+```

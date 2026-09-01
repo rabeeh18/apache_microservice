@@ -24,8 +24,8 @@ The system consists of three main services orchestrated via Docker Compose:
 - **Clear Database**: Allows wiping the index without dropping the collection structure. This keeps the schema intact for future insertions.
 
 ## Similarity Scores
-- **Individual Similarity Score**: Solr's `cosine` similarity function naturally normalizes the distance into a score between 0 and 1, where values closer to 1 indicate higher semantic similarity. This is directly displayed.
-- **Combined Similarity Score**: This is calculated as the arithmetic mean of the individual similarity scores of the returned results. If "Top 10" is selected, it averages the top 10 scores. This gives an overall indicator of how well the result set matches the query.
+- **Individual Similarity Score**: For vector fields using the `cosine` similarity metric, Solr returns a normalized score calculated as `(1 + true_cosine_similarity) / 2`. To display the standard mathematical True Cosine Similarity (which ranges from -1.0 to 1.0, where 1.0 is identical), the GUI recalculates this using the exact formula: `True Cosine Similarity = (2 * Solr_Score) - 1`. This value is directly displayed for each result.
+- **Combined Similarity Score**: This is calculated as the arithmetic mean of the individual true cosine similarity scores of the returned results. If "Top 10" is selected, it averages the top 10 scores. If "All" is selected, it calculates the mean across every document retrieved. This gives an overall indicator of how well the result set matches the query.
 
 ## How to Start the System
 ```bash

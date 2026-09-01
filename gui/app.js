@@ -21,40 +21,25 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const countSelection = document.querySelector('input[name="resultCount"]:checked').value;
-        const topK = countSelection === 'all' ? 10000 : parseInt(countSelection);
+        let topK = 10;
 
         try {
             searchBtn.disabled = true;
             searchBtn.textContent = 'Searching...';
 
-            // 1. Get embedding for the query
-            const embedRes = await fetch('/api/embed', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ text: query })
-            });
-            
-            if (!embedRes.ok) throw new Error('Failed to get embedding from service.');
-            const embedData = await embedRes.json();
-            const vector = embedData.embedding;
-
-            // 2. Query Solr
-            const solrQuery = `{!knn f=vector topK=${topK}}[${vector.join(',')}]`;
-            
-            const solrRes = await fetch('/api/solr/semantic_search/select', {
+            const searchRes = await fetch('/api/search', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    query: solrQuery,
-                    fields: ["id", "text", "score"],
-                    limit: topK
+                    query: query,
+                    result_count: countSelection
                 })
             });
 
-            if (!solrRes.ok) throw new Error('Failed to query Solr.');
-            const solrData = await solrRes.json();
+            if (!searchRes.ok) throw new Error('Failed to query search API.');
+            const searchData = await searchRes.json();
             
-            renderResults(solrData.response.docs);
+            renderResults(searchData.results, searchData.combined_score);
         } catch (error) {
             console.error(error);
             alert(`An error occurred: ${error.message}`);
@@ -64,7 +49,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function renderResults(docs) {
+    function renderResults(docs, combinedScore) {
         resultsList.innerHTML = '';
         
         if (!docs || docs.length === 0) {
@@ -73,16 +58,12 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        let totalScore = 0;
-
         docs.forEach((doc, index) => {
-            totalScore += doc.score;
-            
             const card = document.createElement('div');
             card.className = 'result-card';
             
             // Format score to 3 decimal places
-            const displayScore = doc.score.toFixed(3);
+            const displayScore = doc.similarity.toFixed(3);
             
             card.innerHTML = `
                 <div class="result-header">
@@ -97,9 +78,8 @@ document.addEventListener('DOMContentLoaded', () => {
             resultsList.appendChild(card);
         });
 
-        // Calculate and display combined score
-        const meanScore = (totalScore / docs.length).toFixed(3);
-        combinedScoreSpan.textContent = meanScore;
+        // Display combined score from backend
+        combinedScoreSpan.textContent = combinedScore.toFixed(3);
         summaryDiv.classList.remove('hidden');
     }
 
@@ -112,11 +92,10 @@ document.addEventListener('DOMContentLoaded', () => {
             clearDbBtn.disabled = true;
             clearDbBtn.textContent = 'Clearing...';
 
-            // Delete all documents
-            const res = await fetch('/api/solr/semantic_search/update?commit=true', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ "delete": { "query": "*:*" } })
+            // Delete all documents via the backend clear endpoint
+            const res = await fetch('/api/clear', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' }
             });
 
             if (!res.ok) throw new Error('Failed to clear database.');

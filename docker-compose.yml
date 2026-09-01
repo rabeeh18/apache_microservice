@@ -20,6 +20,8 @@ services:
 
   solr:
     image: solr:9
+    environment:
+      - SOLR_OPTS=-Dsolr.dns.prevent.reverse.lookup=true
     ports:
       - "8983:8983"
     volumes:
@@ -39,7 +41,7 @@ services:
     command: >
       sh -c "
       echo 'Waiting for solr...';
-      until curl -s http://solr:8983/solr/admin/info/system; do
+      until curl -s -f http://solr:8983/solr/semantic_search/schema; do
         sleep 2;
       done;
       echo 'Configuring schema...';
